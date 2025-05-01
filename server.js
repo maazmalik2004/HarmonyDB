@@ -14,6 +14,6 @@ const server = jayson.server({
 });
 
 // Listen on a port
-server.http().listen(4000, () => {
-  console.log('JSON-RPC server is running on port 4000');
+server.http().listen(5000, () => {
+  console.log('JSON-RPC server is running on port 5000');
 });
