@@ -1,6 +1,7 @@
 import jayson from 'jayson';
 import fs from 'fs/promises';
-
+import os from 'os';
+import ip from 'ip'; // For subnet calculation
 class Peer {
     constructor() {
     }
@@ -100,35 +101,77 @@ class Peer {
         });
     }
 
-    async discover(start, end) {
-        for (let port = start; port <= end; port++) {
-            if (port === this.identity.port) {
-                continue;
-            }
-            try {
-                const client = jayson.Client.http({
-                    hostname: this.identity.ip,
-                    port: port
-                });
+    // async discover(start, end) {
+    //     for (let port = start; port <= end; port++) {
+    //         if (port === this.identity.port) {
+    //             continue;
+    //         }
+    //         try {
+    //             const client = jayson.Client.http({
+    //                 hostname: this.identity.ip,
+    //                 port: port
+    //             });
 
-                const response = await this.remoteCall(client, "discover", {
-                    message: "DISCOVER",
-                    payload: {
-                        identity:this.identity
+    //             const response = await this.remoteCall(client, "discover", {
+    //                 message: "DISCOVER",
+    //                 payload: {
+    //                     identity:this.identity
+    //                 }
+    //             });
+
+    //             console.log(response);
+    //             const responsePayloadIdentity = response.payload.identity
+    //             this.clients[responsePayloadIdentity.name] = responsePayloadIdentity 
+    //             console.log(this.clients)
+    //             const latestData = response.payload.latestData
+    //             await this.writeJsonFile("./data.json", latestData)
+    //         } catch (error) {
+    //             console.log(`Port ${port} rejected, moving on`);
+    //         }
+    //     }
+    // }
+
+    async discover(port = 5000) {
+        const interfaces = os.networkInterfaces();
+        const myIp = this.identity.ip;
+
+        for (const iface of Object.values(interfaces)) {
+            for (const ifaceDetail of iface) {
+                if (ifaceDetail.family === 'IPv4' && !ifaceDetail.internal) {
+                    const subnet = ip.subnet(ifaceDetail.address, ifaceDetail.netmask);
+                    for (let current = ip.toLong(subnet.firstAddress); current <= ip.toLong(subnet.lastAddress); current++) {
+                        const targetIp = ip.fromLong(current);
+                        if (targetIp === myIp) continue;
+
+                        try {
+                            const client = jayson.Client.http({
+                                hostname: targetIp,
+                                port: port,
+                                timeout: 1000
+                            });
+
+                            const response = await this.remoteCall(client, "discover", {
+                                message: "DISCOVER",
+                                payload: {
+                                    identity: this.identity
+                                }
+                            });
+
+                            console.log(`[DISCOVER] Found peer at ${targetIp}`);
+                            const responseIdentity = response.payload.identity;
+                            this.clients[responseIdentity.name] = responseIdentity;
+
+                            const latestData = response.payload.latestData;
+                            await this.writeJsonFile("./data.json", latestData);
+                        } catch (error) {
+                            // Timeout or peer not running — ignore
+                        }
                     }
-                });
-
-                console.log(response);
-                const responsePayloadIdentity = response.payload.identity
-                this.clients[responsePayloadIdentity.name] = responsePayloadIdentity 
-                console.log(this.clients)
-                const latestData = response.payload.latestData
-                await this.writeJsonFile("./data.json", latestData)
-            } catch (error) {
-                console.log(`Port ${port} rejected, moving on`);
+                }
             }
         }
     }
+
 
     async discoverAck(args, callback) {
         const request = args[0]

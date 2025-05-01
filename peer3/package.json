@@ -11,6 +11,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "ip": "^2.0.1",
     "jayson": "^4.2.0"
   }
 }
