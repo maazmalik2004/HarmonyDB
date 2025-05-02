@@ -1,5 +1,5 @@
 {
-    "autoDiscoverPeers":true,
+    "autoDiscoverPeers":false,
     "autoDiscoverPort":6000,
     "autoDiscoverSubnetMask":"255.255.255.0",
     "identity":{

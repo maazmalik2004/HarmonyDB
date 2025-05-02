@@ -45,8 +45,6 @@ class Peer {
     async set(key, value) {
         let data = await this.readJsonFile("./data.json");
         data[key] = value;
-        await this.writeJsonFile("./data.json", data);
-    
         const failedPeers = [];
     
         for (const name of Object.keys(this.clients)) {
@@ -73,6 +71,7 @@ class Peer {
         for (const peerName of failedPeers) {
             delete this.clients[peerName];
         }
+        await this.writeJsonFile("./data.json", data);
     }
     
     async get(key){
@@ -218,6 +217,7 @@ class Peer {
     // }
 
     async autoDiscover(subnetMask, port) {
+        console.log("starting peer discovery")
         const interfaces = os.networkInterfaces();
         const myIp = this.identity.ip;
     
@@ -242,7 +242,7 @@ class Peer {
                         const targetIp = ip.fromLong(current);
                         if (targetIp === myIp) continue;
     
-                        console.log(`Probing ${targetIp}:${port}`);
+                        // console.log(`Probing ${targetIp}:${port}`);
                         discoveryTasks.push((async () => {
                             try {
                                 const client = jayson.Client.http({
@@ -264,7 +264,7 @@ class Peer {
                                 const latestData = response.payload.latestData;
                                 await this.writeJsonFile("./data.json", latestData);
                             } catch (error) {
-                                console.log(`[SKIP] ${targetIp} unreachable`);
+                                // console.log(`[SKIP] ${targetIp} unreachable`);
                             }
                         })());
                     }
@@ -273,6 +273,7 @@ class Peer {
         }
     
         await Promise.allSettled(discoveryTasks);
+        console.log("PEER DISCOVERY COMPLETE")
     }
     
     
@@ -303,3 +304,12 @@ export default peer
 //     // await peer.set("name","the two")
 //     console.log("getting...",await peer.get("name"))
 // },5000)
+
+// await peer.set("counter",0)
+
+setInterval(async()=>{
+    console.log("incrementing counter")
+    await peer.set("counter",(await peer.get("counter"))+1)
+    // await peer.set("name","the two")
+    // console.log("getting...",await peer.get("name"))
+},1000)
