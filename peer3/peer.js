@@ -4,10 +4,17 @@ import os from 'os';
 import ip from 'ip'; // For subnet calculation
 class Peer {
     constructor() {
+        //moved to this.initialize
     }
 
     async initialize() {
-        this.identity = await this.readJsonFile("./identity.json")
+        this.config = await this.readJsonFile("./config.json")
+        this.identity = this.config.identity
+        this.peersToDiscover = this.config.peersToDiscover
+        this.autoDiscoverPeers = this.config.autoDiscoverPeers
+
+        console.log("identity",this.identity)
+        console.log("peersToDiscover",this.peersToDiscover)
 
         this.server = jayson.server({
             discover: async(args, callback) => await this.discoverAck(args, callback),
@@ -20,13 +27,10 @@ class Peer {
 
         this.clients = {};
 
-        await this.discover(4000, 4005);
+        if(this.autoDiscoverPeers == false){
+            await this.discover(this.peersToDiscover);
+        }
     }
-
-    // async readJsonFile(path){
-    //     const data = await fs.readFile(path, 'utf-8');
-    //     return JSON.parse(data);
-    // }
 
     async set(key, value){
         let data = await this.readJsonFile("./data.json")
@@ -101,35 +105,44 @@ class Peer {
         });
     }
 
-    async discover(start, end) {
-        for (let port = start; port <= end; port++) {
-            if (port === this.identity.port) {
-                continue;
-            }
+    async discover(peersToDiscover) {
+        for (const peer of peersToDiscover) {
+            const ip = peer.ip;
+            const port = peer.port;
+    
+            // Skip self
+            if (ip === this.identity.ip && port === this.identity.port) continue;
+    
+            console.log("Discovering", ip, port);
+    
             try {
                 const client = jayson.Client.http({
-                    hostname: this.identity.ip,
+                    hostname: ip,
                     port: port
                 });
-
+    
                 const response = await this.remoteCall(client, "discover", {
                     message: "DISCOVER",
                     payload: {
-                        identity:this.identity
+                        identity: this.identity
                     }
                 });
-
-                console.log(response);
-                const responsePayloadIdentity = response.payload.identity
-                this.clients[responsePayloadIdentity.name] = responsePayloadIdentity 
-                console.log(this.clients)
-                const latestData = response.payload.latestData
-                await this.writeJsonFile("./data.json", latestData)
+    
+                console.log("Discover response", response);
+                const responseIdentity = response.payload.identity;
+                this.clients[responseIdentity.name] = responseIdentity;
+                console.log("this.clients", this.clients);
+    
+                const latestData = response.payload.latestData;
+                await this.writeJsonFile("./data.json", latestData);
+                console.log("Latest data", latestData);
+    
             } catch (error) {
-                console.log(`Port ${port} rejected, moving on`);
+                console.log(`Discovery failed at ${ip}:${port} — skipping`);
             }
         }
     }
+    
 
     // async discover(prefix="192.168.1",port = 6000) {
     //     const interfaces = os.networkInterfaces();
@@ -176,11 +189,10 @@ class Peer {
 
     async discoverAck(args, callback) {
         const request = args[0]
-        console.log(request)
+        console.log("discover request",request)
         const requestPayloadIdentity = request.payload.identity
-        console.log(requestPayloadIdentity)
         this.clients[requestPayloadIdentity.name] = requestPayloadIdentity 
-        console.log(this.clients)
+        console.log("this.clients",this.clients)
 
         const latestData = await this.readJsonFile("./data.json")
         callback(null, {
@@ -197,8 +209,8 @@ const peer = new Peer();
 await peer.initialize();
 export default peer
 
-setTimeout(async()=>{
-    await peer.set("name","the one")
-    await peer.set("name","the two")
-    console.log("getting...",await peer.get("meow"))
-},5000)
+// setTimeout(async()=>{
+//     await peer.set("name","the one")
+//     await peer.set("name","the two")
+//     console.log("getting...",await peer.get("meow"))
+// },5000)
