@@ -1,5 +1,8 @@
 {
-  "name": "robert",
+  "name": "mr meow meow",
   "age": 50,
-  "nationality": "american"
+  "nationality": "american",
+  "counter": {
+    "some key": "some value"
+  }
 }

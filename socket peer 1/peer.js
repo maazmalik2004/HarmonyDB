@@ -382,14 +382,27 @@ class Peer {
         await Promise.allSettled(discoveryTasks);
         console.log("PEER DISCOVERY COMPLETE");
     }
+
+    async getConfig(){
+        return this.config
+    }
+
+    async getPeers(){
+        return this.clients
+    }
+
+    async getData(){
+        return await JSON.parse(await fs.readFile('./data.json', 'utf8'));
+    }
 }
 
 const peer = new Peer();
 await peer.initialize();
 export default peer
 
-// Uncomment to test automatic changes
+// // Uncomment to test automatic changes
 // setInterval(async() => {
 //     console.log("incrementing counter");
 //     await peer.set("counter", (await peer.get("counter")) + 1);
-// }, 1000);
+// }, 2000);
+
