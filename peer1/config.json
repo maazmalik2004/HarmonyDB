@@ -1,6 +1,7 @@
 {
-    "autoDiscoverPeers":false,
+    "autoDiscoverPeers":true,
     "autoDiscoverPort":6000,
+    "autoDiscoverSubnetMask":"255.255.255.0",
     "identity":{
         "name":"peer1",
         "ip":"192.168.1.6",

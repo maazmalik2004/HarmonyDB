@@ -14,6 +14,7 @@ class Peer {
         this.peersToDiscover = this.config.peersToDiscover
         this.autoDiscoverPeers = this.config.autoDiscoverPeers
         this.autoDiscoverPort = this.config.autoDiscoverPort
+        this.autoDiscoverSubnetMask = this.config.autoDiscoverSubnetMask
 
         console.log(this.config)
 
@@ -35,7 +36,7 @@ class Peer {
         this.clients = {};
 
         if(this.autoDiscoverPeers == true){
-            await this.autoDiscover(this.port)
+            await this.autoDiscover(this.autoDiscoverSubnetMask, this.port)
         }else{
             await this.discover(this.peersToDiscover);
         }
@@ -162,7 +163,61 @@ class Peer {
         await Promise.allSettled(discoveryPromises);
     }
     
-    async autoDiscover(port) {
+    // async autoDiscover(subnetMask, port) {
+    //     const interfaces = os.networkInterfaces();
+    //     const myIp = this.identity.ip;
+    
+    //     const discoveryTasks = [];
+    
+    //     for (const iface of Object.values(interfaces)) {
+    //         for (const ifaceDetail of iface) {
+    //             if (ifaceDetail.family === 'IPv4' && !ifaceDetail.internal) {
+    //                 const subnet = ip.subnet(ifaceDetail.address, ifaceDetail.netmask);
+    //                 for (
+    //                     let current = ip.toLong(subnet.firstAddress);
+    //                     current <= ip.toLong(subnet.lastAddress);
+    //                     current++
+    //                 ) {
+    //                     const targetIp = ip.fromLong(current);
+    //                     if (targetIp === myIp) continue;
+
+    //                     console.log(targetIp)
+    //                     console.log(port)
+    //                     discoveryTasks.push((async () => {
+    //                         try {
+    //                             const client = jayson.Client.http({
+    //                                 hostname: targetIp,
+    //                                 port: port,
+    //                             });
+    
+    //                             const response = await this.remoteCall(client, "discover", {
+    //                                 message: "DISCOVER",
+    //                                 payload: {
+    //                                     identity: this.identity
+    //                                 }
+    //                             });
+    
+    //                             console.log(`[DISCOVER] Found peer at ${targetIp}`);
+    //                             const responseIdentity = response.payload.identity;
+    //                             this.clients[responseIdentity.name] = responseIdentity;
+    
+    //                             const latestData = response.payload.latestData;
+    //                             await this.writeJsonFile("./data.json", latestData);
+    //                         } catch (error) {
+    //                             // Silent fail is okay — likely no peer on that IP
+    //                             console.log("could not connect")
+    //                         }
+    //                     })());
+    //                 }
+    //             }
+    //         }
+    //     }
+    
+    //     // Wait for all discovery attempts to complete
+    //     await Promise.allSettled(discoveryTasks);
+    // }
+
+    async autoDiscover(subnetMask, port) {
         const interfaces = os.networkInterfaces();
         const myIp = this.identity.ip;
     
@@ -171,7 +226,14 @@ class Peer {
         for (const iface of Object.values(interfaces)) {
             for (const ifaceDetail of iface) {
                 if (ifaceDetail.family === 'IPv4' && !ifaceDetail.internal) {
-                    const subnet = ip.subnet(ifaceDetail.address, ifaceDetail.netmask);
+                    // Use provided subnet mask instead of detected one
+                    const subnet = ip.subnet(ifaceDetail.address, subnetMask);
+                    
+                    // If myIp is not in this subnet, skip
+                    if (!ip.cidrSubnet(`${ifaceDetail.address}/${subnetMask}`).contains(myIp)) {
+                        continue;
+                    }
+    
                     for (
                         let current = ip.toLong(subnet.firstAddress);
                         current <= ip.toLong(subnet.lastAddress);
@@ -180,6 +242,7 @@ class Peer {
                         const targetIp = ip.fromLong(current);
                         if (targetIp === myIp) continue;
     
+                        console.log(`Probing ${targetIp}:${port}`);
                         discoveryTasks.push((async () => {
                             try {
                                 const client = jayson.Client.http({
@@ -201,7 +264,7 @@ class Peer {
                                 const latestData = response.payload.latestData;
                                 await this.writeJsonFile("./data.json", latestData);
                             } catch (error) {
-                                // Silent fail is okay — likely no peer on that IP
+                                console.log(`[SKIP] ${targetIp} unreachable`);
                             }
                         })());
                     }
@@ -209,9 +272,9 @@ class Peer {
             }
         }
     
-        // Wait for all discovery attempts to complete
         await Promise.allSettled(discoveryTasks);
     }
+    
     
     async discoverAck(args, callback) {
         const request = args[0]
