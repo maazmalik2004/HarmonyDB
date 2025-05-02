@@ -1,5 +1,6 @@
 {
     "autoDiscoverPeers":false,
+    "autoDiscoverPort":6000,
     "identity":{
         "name":"peer2",
         "ip":"192.168.1.6",

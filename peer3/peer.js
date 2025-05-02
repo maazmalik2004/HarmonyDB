@@ -21,8 +21,9 @@ class Peer {
             set: async(args, callback) => await this.setter(args,callback)
         });
 
-        this.server.http().listen(this.identity.port, () => {
-            console.log(`JSON-RPC server is running on port ${this.identity.port}`);
+        this.port = this.autoDiscoverPeers ? this.autoDiscoverPort : this.identity.port
+        this.server.http().listen(this.port, () => {
+            console.log(`JSON-RPC server is running on port ${this.port}`);
         });
 
         this.clients = {};
@@ -209,8 +210,8 @@ const peer = new Peer();
 await peer.initialize();
 export default peer
 
-// setTimeout(async()=>{
-//     await peer.set("name","the one")
-//     await peer.set("name","the two")
-//     console.log("getting...",await peer.get("meow"))
-// },5000)
+setTimeout(async()=>{
+    await peer.set("name","robert")
+    // await peer.set("name","the two")
+    console.log("getting...",await peer.get("name"))
+},5000)
