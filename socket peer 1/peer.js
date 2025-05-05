@@ -1,456 +1,9 @@
-// import net from 'net';
-// import fs from 'fs/promises';
-// import os from 'os';
-// import ip from 'ip';
-// import crypto from "crypto"
-
-// class Peer {
-//     constructor() {
-//         // Initialization moved to this.initialize
-//     }
-
-//     async initialize() {
-//         this.config = await this.readJsonFile("./config.json");
-//         this.identity = this.config.identity;
-//         this.peersToDiscover = this.config.peersToDiscover;
-//         this.autoDiscoverPeers = this.config.autoDiscoverPeers;
-//         this.autoDiscoverPort = this.config.autoDiscoverPort;
-//         this.autoDiscoverSubnetMask = this.config.autoDiscoverSubnetMask;
-
-//         console.log(this.config);
-
-//         if (this.autoDiscoverPeers === true) {
-//             this.port = this.autoDiscoverPort;
-//             this.identity.port = this.autoDiscoverPort;
-//         } else {
-//             this.port = this.identity.port;
-//         }
-
-//         // Initialize socket server
-//         this.server = net.createServer((socket) => this.handleConnection(socket));
-//         this.server.listen(this.port, () => {
-//             console.log(`Socket server is running on port ${this.port}`);
-//         });
-
-//         // Store connected clients
-//         this.clients = {}; 
-//         this.sockets = {}; // Map peer names to their socket connections
-
-//         this.keyPair = null;
-
-//         const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
-//             modulusLength: 2048,
-//             publicKeyEncoding: {
-//                 type: 'spki',
-//                 format: 'pem'
-//             },
-//             privateKeyEncoding: {
-//                 type: 'pkcs8',
-//                 format: 'pem'
-//             }
-//         });
-
-//         this.keyPair = { publicKey, privateKey };
-
-
-//         // Start peer discovery
-//         if (this.autoDiscoverPeers == true) {
-//             await this.autoDiscover(this.autoDiscoverSubnetMask, this.port);
-//         } else {
-//             await this.discover(this.peersToDiscover);
-//         }
-//     }
-
-//     async handleConnection(socket) {
-//         socket.setEncoding('utf8');
-        
-//         let dataBuffer = '';
-        
-//         socket.on('data', async (data) => {
-//             dataBuffer += data;
-            
-//             try {
-//                 // Try to parse accumulated data as JSON
-//                 // This handles cases where data might come in multiple chunks
-//                 const messages = this.extractJsonMessages(dataBuffer);
-                
-//                 if (messages.length > 0) {
-//                     // Process each complete message
-//                     for (const message of messages) {
-//                         await this.handleMessage(message, socket);
-//                     }
-                    
-//                     // Keep any remaining incomplete data
-//                     dataBuffer = dataBuffer.substring(dataBuffer.lastIndexOf('}') + 1);
-//                 }
-//             } catch (err) {
-//                 // If we can't parse as JSON yet, wait for more data
-//             }
-//         });
-        
-//         socket.on('close', () => {
-//             // Find and remove the disconnected peer
-//             for (const [name, clientSocket] of Object.entries(this.sockets)) {
-//                 if (clientSocket === socket) {
-//                     console.log(`Peer ${name} disconnected`);
-//                     delete this.sockets[name];
-//                     delete this.clients[name];
-//                     break;
-//                 }
-//             }
-//         });
-        
-//         socket.on('error', (err) => {
-//             console.log(`Socket error: ${err.message}`);
-//         });
-//     }
-
-//     extractJsonMessages(data) {
-//         const messages = [];
-//         let bracketCount = 0;
-//         let startPos = data.indexOf('{');
-        
-//         if (startPos === -1) return messages;
-        
-//         for (let i = startPos; i < data.length; i++) {
-//             if (data[i] === '{') bracketCount++;
-//             else if (data[i] === '}') bracketCount--;
-            
-//             if (bracketCount === 0) {
-//                 try {
-//                     const jsonStr = data.substring(startPos, i + 1);
-//                     const jsonObj = JSON.parse(jsonStr);
-//                     messages.push(jsonObj);
-//                     startPos = data.indexOf('{', i + 1);
-//                     if (startPos === -1) break;
-//                     i = startPos - 1;
-//                 } catch (err) {
-//                     // Not a valid JSON yet, continue
-//                 }
-//             }
-//         }
-        
-//         return messages;
-//     }
-
-//     async handleMessage(message, socket) {
-//         console.log(`Received message: ${message.type}`);
-        
-//         switch (message.type) {
-//             case 'DISCOVER':
-//                 await this.handleDiscover(message, socket);
-//                 break;
-                
-//             case 'DISCOVERACK':
-//                 await this.handleDiscoverAck(message, socket);
-//                 break;
-                
-//             case 'UPDATE':
-//                 await this.handleUpdate(message, socket);
-//                 break;
-                
-//             case 'UPDATEACK':
-//                 // Handle acknowledge if needed
-//                 break;
-                
-//             default:
-//                 console.log(`Unknown message type: ${message.type}`);
-//         }
-//     }
-
-//     async handleDiscover(message, socket) {
-//         const requestIdentity = message.payload.identity;
-//         console.log(`Discovery request from: ${requestIdentity.name}`);
-        
-//         // Store the peer info
-//         this.clients[requestIdentity.name] = requestIdentity;
-//         this.sockets[requestIdentity.name] = socket;
-        
-//         // Send response
-//         const latestData = await this.readJsonFile("./data.bin");
-//         const response = {
-//             type: 'DISCOVERACK',
-//             payload: {
-//                 latestData: latestData,
-//                 identity: this.identity
-//             }
-//         };
-        
-//         socket.write(JSON.stringify(response));
-//     }
-
-//     async handleDiscoverAck(message, socket) {
-//         const responseIdentity = message.payload.identity;
-//         console.log(`Discovery acknowledgment from: ${responseIdentity.name}`);
-        
-//         // Store the peer info
-//         this.clients[responseIdentity.name] = responseIdentity;
-//         this.sockets[responseIdentity.name] = socket;
-        
-//         // Update local data
-//         const latestData = message.payload.latestData;
-//         await this.writeJsonFile("./data.bin", latestData);
-//     }
-
-//     async handleUpdate(message, socket) {
-//         const updatePayload = message.payload;
-//         const key = updatePayload.updatedKey;
-//         const value = updatePayload.updatedValue;
-        
-//         console.log(`[UPDATE] ${key} = ${value}`);
-        
-//         // Update local data
-//         let data = await this.readJsonFile("./data.bin");
-//         data[key] = value;
-//         await this.writeJsonFile("./data.bin", data);
-        
-//         // Send acknowledgment
-//         const response = {
-//             type: 'UPDATEACK',
-//             payload: {}
-//         };
-        
-//         socket.write(JSON.stringify(response));
-//     }
-
-//     async connectToPeer(peerIp, peerPort) {
-//         return new Promise((resolve, reject) => {
-//             const socket = new net.Socket();
-            
-//             socket.connect(peerPort, peerIp, () => {
-//                 console.log(`Connected to peer at ${peerIp}:${peerPort}`);
-//                 resolve(socket);
-//             });
-            
-//             socket.on('error', (err) => {
-//                 reject(err);
-//             });
-            
-//             // Setup socket data handling after connection
-//             socket.on('data', async (data) => {
-//                 let dataBuffer = data.toString();
-                
-//                 try {
-//                     const messages = this.extractJsonMessages(dataBuffer);
-                    
-//                     for (const message of messages) {
-//                         await this.handleMessage(message, socket);
-//                     }
-//                 } catch (err) {
-//                     console.log(`Error processing data: ${err.message}`);
-//                 }
-//             });
-            
-//             socket.on('close', () => {
-//                 // Handle socket close
-//                 for (const [name, clientSocket] of Object.entries(this.sockets)) {
-//                     if (clientSocket === socket) {
-//                         console.log(`Lost connection to peer ${name}`);
-//                         delete this.sockets[name];
-//                         delete this.clients[name];
-//                         break;
-//                     }
-//                 }
-//             });
-//         });
-//     }
-
-//     async set(key, value) {
-//         // Update local data
-//         let data = await this.readJsonFile("./data.bin");
-//         data[key] = value;
-//         await this.writeJsonFile("./data.bin", data);
-        
-//         // Propagate to peers
-//         const failedPeers = [];
-        
-//         // Create update message
-//         const updateMessage = {
-//             type: 'UPDATE',
-//             payload: {
-//                 updatedKey: key,
-//                 updatedValue: value
-//             }
-//         };
-        
-//         // Send to all connected peers
-//         for (const name of Object.keys(this.sockets)) {
-//             const socket = this.sockets[name];
-            
-//             try {
-//                 socket.write(JSON.stringify(updateMessage));
-//             } catch (error) {
-//                 console.log(`[ERROR] Failed to send update to peer ${name}. Removing from clients.`);
-//                 failedPeers.push(name);
-//             }
-//         }
-        
-//         // Remove failed peers
-//         for (const peerName of failedPeers) {
-//             delete this.sockets[peerName];
-//             delete this.clients[peerName];
-//         }
-//     }
-    
-//     async get(key) {
-//         let data = await this.readJsonFile("./data.bin");
-//         return data[key];
-//     }
-
-//     async readJsonFile(path) {
-//             try {
-//                 const data = await fs.readFile(path, 'utf-8');
-//                 return JSON.parse(data);
-//             } catch (err) {
-//                 if (err.code === 'ENOENT') {
-//                     await fs.writeFile(path, '{}', 'utf-8');
-//                     retarn {};
-//                 }
-//                 throw err;
-//             }
-//         }
-    
-//     async writeJsonFile(path, data) {
-//             await fs.writeFile(path, JSON.stringify(data, null, 2));
-//         }
-
-//     async readData(path) {
-//         try {
-//             const data = await fs.readFile(path); // ⛳ read as Buffer
-//             const privateKey = this.keyPair.privateKey;
-
-//             const decryptedBuffer = crypto.privateDecrypt(privateKey, data);
-//             return JSON.parse(decryptedBuffer.toString()); // ✅ toString before parse
-//         } catch (err) {
-//             if (err.code === 'ENOENT') {
-//                 await fs.writeFile(path, '{}', 'utf-8');
-//                 return {};
-//             }
-//             throw err;
-//         }
-//     }
-
-//     async writeData(path, data) {
-//         const publicKey = this.keyPair.publicKey;
-//         const encryptedBuffer = crypto.publicEncrypt(publicKey, Buffer.from(JSON.stringify(data)));
-//         await fs.writeFile(path, encryptedBuffer);
-//     }
-
-//     async discover(peersToDiscover) {
-//         const discoveryPromises = peersToDiscover
-//             .filter(peer => !(peer.ip === this.identity.ip && peer.port === this.identity.port))
-//             .map(async peer => {
-//                 const peerIp = peer.ip;
-//                 const peerPort = peer.port;
-//                 console.log(`Discovering peer at ${peerIp}:${peerPort}`);
-    
-//                 try {
-//                     // Connect to peer
-//                     const socket = await this.connectToPeer(peerIp, peerPort);
-                    
-//                     // Send discovery message
-//                     const discoverMessage = {
-//                         type: 'DISCOVER',
-//                         payload: {
-//                             identity: this.identity
-//                         }
-//                     };
-                    
-//                     socket.write(JSON.stringify(discoverMessage));
-                    
-//                     // The rest of discovery processing happens in the socket's data event handler
-//                 } catch (error) {
-//                     console.log(`Discovery failed at ${peerIp}:${peerPort} — skipping`);
-//                 }
-//             });
-    
-//         await Promise.allSettled(discoveryPromises);
-//     }
-    
-//     async autoDiscover(subnetMask, port) {
-//         console.log("Starting peer discovery");
-//         const interfaces = os.networkInterfaces();
-//         const myIp = this.identity.ip;
-    
-//         const discoveryTasks = [];
-    
-//         for (const iface of Object.values(interfaces)) {
-//             for (const ifaceDetail of iface) {
-//                 if (ifaceDetail.family === 'IPv4' && !ifaceDetail.internal) {
-//                     // Use provided subnet mask instead of detected one
-//                     const subnet = ip.subnet(ifaceDetail.address, subnetMask);
-                    
-//                     // If myIp is not in this subnet, skip
-//                     if (!ip.cidrSubnet(`${ifaceDetail.address}/${subnetMask}`).contains(myIp)) {
-//                         continue;
-//                     }
-    
-//                     for (
-//                         let current = ip.toLong(subnet.firstAddress);
-//                         current <= ip.toLong(subnet.lastAddress);
-//                         current++
-//                     ) {
-//                         const targetIp = ip.fromLong(current);
-//                         if (targetIp === myIp) continue;
-    
-//                         discoveryTasks.push((async () => {
-//                             try {
-//                                 // Try to connect to peer
-//                                 const socket = await this.connectToPeer(targetIp, port).catch(() => null);
-                                
-//                                 if (socket) {
-//                                     // Send discovery message
-//                                     const discoverMessage = {
-//                                         type: 'DISCOVER',
-//                                         payload: {
-//                                             identity: this.identity
-//                                         }
-//                                     };
-                                    
-//                                     socket.write(JSON.stringify(discoverMessage));
-//                                     console.log(`[DISCOVER] Sent discovery to peer at ${targetIp}`);
-//                                 }
-//                             } catch (error) {
-//                                 // No peer at this IP/port
-//                             }
-//                         })());
-//                     }
-//                 }
-//             }
-//         }
-    
-//         await Promise.allSettled(discoveryTasks);
-//         console.log("PEER DISCOVERY COMPLETE");
-//     }
-
-//     async getConfig(){
-//         return this.config
-//     }
-
-//     async getPeers(){
-//         return this.clients
-//     }
-
-//     async getData(){
-//         return await JSON.parse(await fs.readFile('./data.bin', 'utf8'));
-//     }
-// }
-
-// const peer = new Peer();
-// await peer.initialize();
-// export default peer
-
-// // // Uncomment to test automatic changes
-// // setInterval(async() => {
-// //     console.log("incrementing counter");
-// //     await peer.set("counter", (await peer.get("counter")) + 1);
-// // }, 2000);
-
-import net from 'net';
+import tls from 'tls';
 import fs from 'fs/promises';
 import os from 'os';
 import ip from 'ip';
-import crypto from "crypto"
+import crypto from "crypto";
+import forge from 'node-forge';
 
 class Peer {
     constructor() {
@@ -474,76 +27,209 @@ class Peer {
             this.port = this.identity.port;
         }
 
-        // Initialize socket server
-        this.server = net.createServer((socket) => this.handleConnection(socket));
+        // Load or generate RSA key pair for data-at-rest encryption
+        this.keyPair = await this.loadOrGenerateKeyPair();
+
+        // Load or generate certificate
+        const certFiles = await this.loadOrGenerateCertificate(this.identity);
+        this.tlsOptions = {
+            key: certFiles.key,
+            cert: certFiles.cert,
+            rejectUnauthorized: false, // Allow self-signed certs, verified manually
+            requestCert: true // Request client certificates
+        };
+
+        // Initialize trusted certificates store
+        this.trustedCertificates = await this.loadTrustedCertificates();
+
+        // Initialize data store first
+        try {
+            await fs.access('./data.bin');
+            // Try to read existing data to ensure it's valid
+            await this.readData('./data.bin');
+        } catch (err) {
+            if (err.code === 'ENOENT' || err instanceof SyntaxError) {
+                // Initialize new data store
+                await this.writeData('./data.bin', {});
+            } else {
+                throw err;
+            }
+        }
+
+        // Initialize TLS server
+        this.server = tls.createServer(this.tlsOptions, (socket) => this.handleConnection(socket));
         this.server.listen(this.port, () => {
-            console.log(`Socket server is running on port ${this.port}`);
+            console.log(`TLS server is running on port ${this.port}`);
         });
 
         // Store connected clients
-        this.clients = {}; 
-        this.sockets = {}; // Map peer names to their socket connections
-
-        // Generate RSA key pair for encryption
-        const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
-            modulusLength: 2048,
-            publicKeyEncoding: {
-                type: 'spki',
-                format: 'pem'
-            },
-            privateKeyEncoding: {
-                type: 'pkcs8',
-                format: 'pem'
-            }
-        });
-
-        this.keyPair = { publicKey, privateKey };
-
-        // Create empty data file if it doesn't exist
-        try {
-            await fs.access('./data.bin');
-        } catch (err) {
-            // Initialize with empty object and encrypt it
-            await this.writeData('./data.bin', {});
-        }
+        this.clients = {};
+        this.sockets = {};
 
         // Start peer discovery
-        if (this.autoDiscoverPeers == true) {
+        if (this.autoDiscoverPeers) {
             await this.autoDiscover(this.autoDiscoverSubnetMask, this.port);
         } else {
             await this.discover(this.peersToDiscover);
         }
     }
 
+    async loadOrGenerateKeyPair() {
+        try {
+            // Try to load existing key pair
+            const publicKey = await fs.readFile('./public.pem', 'utf-8');
+            const privateKey = await fs.readFile('./private.pem', 'utf-8');
+            console.log('Loaded existing RSA key pair');
+            return { publicKey, privateKey };
+        } catch (err) {
+            if (err.code === 'ENOENT') {
+                // Generate new key pair if none exists
+                console.log('Generating new RSA key pair');
+                const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
+                    modulusLength: 2048,
+                    publicKeyEncoding: {
+                        type: 'spki',
+                        format: 'pem'
+                    },
+                    privateKeyEncoding: {
+                        type: 'pkcs8',
+                        format: 'pem'
+                    }
+                });
+                // Save the key pair
+                await fs.writeFile('./public.pem', publicKey);
+                await fs.writeFile('./private.pem', privateKey);
+                return { publicKey, privateKey };
+            }
+            throw err;
+        }
+    }
+
+    async loadOrGenerateCertificate(identity) {
+        try {
+            // Try to load existing certificate
+            const cert = await fs.readFile('./cert.pem', 'utf-8');
+            const key = await fs.readFile('./key.pem', 'utf-8');
+            console.log('Loaded existing certificate');
+            return { cert, key };
+        } catch (err) {
+            if (err.code === 'ENOENT') {
+                // Generate new certificate if none exists
+                console.log('Generating new certificate');
+                const certFiles = await this.generateSelfSignedCertificate(identity);
+                // Save the certificate and key
+                await fs.writeFile('./cert.pem', certFiles.cert);
+                await fs.writeFile('./key.pem', certFiles.key);
+                return certFiles;
+            }
+            throw err;
+        }
+    }
+
+    async generateSelfSignedCertificate(identity) {
+        // Generate a new key pair
+        const keys = forge.pki.rsa.generateKeyPair(2048);
+        
+        // Create a new certificate
+        const cert = forge.pki.createCertificate();
+        cert.publicKey = keys.publicKey;
+        cert.serialNumber = '01' + forge.util.bytesToHex(forge.random.getBytes(8));
+        cert.validity.notBefore = new Date();
+        cert.validity.notAfter = new Date();
+        cert.validity.notAfter.setFullYear(cert.validity.notBefore.getFullYear() + 1);
+
+        // Set certificate attributes
+        const attrs = [{
+            name: 'commonName',
+            value: identity.name
+        }, {
+            name: 'organizationName',
+            value: 'HarmonyDB'
+        }];
+
+        cert.setSubject(attrs);
+        cert.setIssuer(attrs);
+
+        // Self-sign the certificate
+        cert.sign(keys.privateKey, forge.md.sha256.create());
+
+        // Convert to PEM format
+        const certPem = forge.pki.certificateToPem(cert);
+        const privateKeyPem = forge.pki.privateKeyToPem(keys.privateKey);
+
+        return {
+            cert: certPem,
+            key: privateKeyPem
+        };
+    }
+
+    async loadTrustedCertificates(){
+        try {
+            const data = await fs.readFile('./trusted_peers.json', 'utf-8');
+            if (data.trim() === '') {
+                // Handle empty file
+                await fs.writeFile('./trusted_peers.json', '{}', 'utf-8');
+                return {};
+            }
+            return JSON.parse(data);
+        } catch (err) {
+            if (err.code === 'ENOENT') {
+                // File doesn't exist, create it
+                await fs.writeFile('./trusted_peers.json', '{}', 'utf-8');
+                return {};
+            } else if (err instanceof SyntaxError) {
+                // Invalid JSON, overwrite with empty object
+                console.warn('Invalid JSON in trusted_peers.json, initializing with empty object');
+                await fs.writeFile('./trusted_peers.json', '{}', 'utf-8');
+                return {};
+            }
+            throw err;
+        }
+    }
+
+    async saveTrustedCertificate(peerName, cert) {
+        this.trustedCertificates[peerName] = cert;
+        await fs.writeFile('./trusted_peers.json', JSON.stringify(this.trustedCertificates, null, 2));
+    }
+
     async handleConnection(socket) {
         socket.setEncoding('utf8');
-        
         let dataBuffer = '';
-        
+
+        // Verify peer certificate
+        const cert = socket.getPeerCertificate();
+        if (!cert || !cert.raw) {
+            console.error('No peer certificate provided');
+            socket.destroy();
+            return;
+        }
+        const peerName = cert.subject?.CN || 'unknown';
+        if (!this.trustedCertificates[peerName]) {
+            // Trust-on-first-use: Store certificate
+            await this.saveTrustedCertificate(peerName, cert.raw.toString('base64'));
+            console.log(`Trusted new certificate for ${peerName}`);
+        } else if (this.trustedCertificates[peerName] !== cert.raw.toString('base64')) {
+            console.error(`Certificate mismatch for ${peerName}`);
+            socket.destroy();
+            return;
+        }
+
         socket.on('data', async (data) => {
             dataBuffer += data;
-            
             try {
-                // Try to parse accumulated data as JSON
-                // This handles cases where data might come in multiple chunks
                 const messages = this.extractJsonMessages(dataBuffer);
-                
                 if (messages.length > 0) {
-                    // Process each complete message
                     for (const message of messages) {
                         await this.handleMessage(message, socket);
                     }
-                    
-                    // Keep any remaining incomplete data
                     dataBuffer = dataBuffer.substring(dataBuffer.lastIndexOf('}') + 1);
                 }
             } catch (err) {
-                // If we can't parse as JSON yet, wait for more data
+                // Wait for more data
             }
         });
-        
+
         socket.on('close', () => {
-            // Find and remove the disconnected peer
             for (const [name, clientSocket] of Object.entries(this.sockets)) {
                 if (clientSocket === socket) {
                     console.log(`Peer ${name} disconnected`);
@@ -553,7 +239,7 @@ class Peer {
                 }
             }
         });
-        
+
         socket.on('error', (err) => {
             console.log(`Socket error: ${err.message}`);
         });
@@ -563,13 +249,11 @@ class Peer {
         const messages = [];
         let bracketCount = 0;
         let startPos = data.indexOf('{');
-        
         if (startPos === -1) return messages;
-        
+
         for (let i = startPos; i < data.length; i++) {
             if (data[i] === '{') bracketCount++;
             else if (data[i] === '}') bracketCount--;
-            
             if (bracketCount === 0) {
                 try {
                     const jsonStr = data.substring(startPos, i + 1);
@@ -579,34 +263,27 @@ class Peer {
                     if (startPos === -1) break;
                     i = startPos - 1;
                 } catch (err) {
-                    // Not a valid JSON yet, continue
+                    // Not valid JSON yet
                 }
             }
         }
-        
         return messages;
     }
 
     async handleMessage(message, socket) {
         console.log(`Received message: ${message.type}`);
-        
         switch (message.type) {
             case 'DISCOVER':
                 await this.handleDiscover(message, socket);
                 break;
-                
             case 'DISCOVERACK':
                 await this.handleDiscoverAck(message, socket);
                 break;
-                
             case 'UPDATE':
                 await this.handleUpdate(message, socket);
                 break;
-                
             case 'UPDATEACK':
-                // Handle acknowledge if needed
                 break;
-                
             default:
                 console.log(`Unknown message type: ${message.type}`);
         }
@@ -615,78 +292,105 @@ class Peer {
     async handleDiscover(message, socket) {
         const requestIdentity = message.payload.identity;
         console.log(`Discovery request from: ${requestIdentity.name}`);
-        
-        // Store the peer info
+
+        // Store peer info (certificate already verified in handleConnection)
         this.clients[requestIdentity.name] = requestIdentity;
         this.sockets[requestIdentity.name] = socket;
-        
-        // Send response
-        const latestData = await this.readData("./data.bin");
+
+        // Send response with empty data if we can't read it
+        let latestData;
+        try {
+            latestData = await this.readData("./data.bin");
+        } catch (err) {
+            console.log('Error reading data during discovery, sending empty data');
+            latestData = {};
+        }
+
         const response = {
             type: 'DISCOVERACK',
             payload: {
-                latestData: latestData,
+                latestData,
                 identity: this.identity
             }
         };
-        
         socket.write(JSON.stringify(response));
     }
 
     async handleDiscoverAck(message, socket) {
         const responseIdentity = message.payload.identity;
         console.log(`Discovery acknowledgment from: ${responseIdentity.name}`);
-        
-        // Store the peer info
+
+        // Store peer info
         this.clients[responseIdentity.name] = responseIdentity;
         this.sockets[responseIdentity.name] = socket;
-        
-        // Update local data
+
+        // Update local data if available
         const latestData = message.payload.latestData;
-        await this.writeData("./data.bin", latestData);
+        if (latestData && typeof latestData === 'object') {
+            try {
+                await this.writeData("./data.bin", latestData);
+            } catch (err) {
+                console.log('Error updating data from peer:', err.message);
+            }
+        }
     }
 
     async handleUpdate(message, socket) {
-        const updatePayload = message.payload;
-        const key = updatePayload.updatedKey;
-        const value = updatePayload.updatedValue;
-        
-        console.log(`[UPDATE] ${key} = ${value}`);
-        
+        const { updatedKey, updatedValue } = message.payload;
+        console.log(`[UPDATE] ${updatedKey} = ${updatedValue}`);
+
         // Update local data
         let data = await this.readData("./data.bin");
-        data[key] = value;
+        data[updatedKey] = updatedValue;
         await this.writeData("./data.bin", data);
-        
+
         // Send acknowledgment
         const response = {
             type: 'UPDATEACK',
             payload: {}
         };
-        
         socket.write(JSON.stringify(response));
     }
 
     async connectToPeer(peerIp, peerPort) {
         return new Promise((resolve, reject) => {
-            const socket = new net.Socket();
-            
-            socket.connect(peerPort, peerIp, () => {
+            const socket = tls.connect({
+                host: peerIp,
+                port: peerPort,
+                ...this.tlsOptions,
+                servername: peerIp // For SNI, though not critical for self-signed certs
+            }, () => {
+                // Verify peer certificate
+                const cert = socket.getPeerCertificate();
+                if (!cert || !cert.raw) {
+                    console.error(`No certificate from ${peerIp}:${peerPort}`);
+                    socket.destroy();
+                    reject(new Error('No peer certificate'));
+                    return;
+                }
+                const peerName = cert.subject?.CN || 'unknown';
+                if (!this.trustedCertificates[peerName]) {
+                    // Trust-on-first-use
+                    this.saveTrustedCertificate(peerName, cert.raw.toString('base64'));
+                    console.log(`Trusted new certificate for ${peerName}`);
+                } else if (this.trustedCertificates[peerName] !== cert.raw.toString('base64')) {
+                    console.error(`Certificate mismatch for ${peerName}`);
+                    socket.destroy();
+                    reject(new Error('Certificate mismatch'));
+                    return;
+                }
                 console.log(`Connected to peer at ${peerIp}:${peerPort}`);
                 resolve(socket);
             });
-            
+
             socket.on('error', (err) => {
                 reject(err);
             });
-            
-            // Setup socket data handling after connection
+
             socket.on('data', async (data) => {
                 let dataBuffer = data.toString();
-                
                 try {
                     const messages = this.extractJsonMessages(dataBuffer);
-                    
                     for (const message of messages) {
                         await this.handleMessage(message, socket);
                     }
@@ -694,9 +398,8 @@ class Peer {
                     console.log(`Error processing data: ${err.message}`);
                 }
             });
-            
+
             socket.on('close', () => {
-                // Handle socket close
                 for (const [name, clientSocket] of Object.entries(this.sockets)) {
                     if (clientSocket === socket) {
                         console.log(`Lost connection to peer ${name}`);
@@ -710,15 +413,11 @@ class Peer {
     }
 
     async set(key, value) {
-        // Update local data
         let data = await this.readData("./data.bin");
         data[key] = value;
         await this.writeData("./data.bin", data);
-        
-        // Propagate to peers
+
         const failedPeers = [];
-        
-        // Create update message
         const updateMessage = {
             type: 'UPDATE',
             payload: {
@@ -726,11 +425,9 @@ class Peer {
                 updatedValue: value
             }
         };
-        
-        // Send to all connected peers
+
         for (const name of Object.keys(this.sockets)) {
             const socket = this.sockets[name];
-            
             try {
                 socket.write(JSON.stringify(updateMessage));
             } catch (error) {
@@ -738,14 +435,13 @@ class Peer {
                 failedPeers.push(name);
             }
         }
-        
-        // Remove failed peers
+
         for (const peerName of failedPeers) {
             delete this.sockets[peerName];
             delete this.clients[peerName];
         }
     }
-    
+
     async get(key) {
         let data = await this.readData("./data.bin");
         return data[key];
@@ -763,81 +459,32 @@ class Peer {
             throw err;
         }
     }
-    
+
     async writeJsonFile(path, data) {
         await fs.writeFile(path, JSON.stringify(data, null, 2));
     }
 
-    // async readData(path) {
-    //     try {
-    //         // Check if file exists
-    //         try {
-    //             await fs.access(path);
-    //         } catch (err) {
-    //             // If file doesn't exist, create it
-    //             if (err.code === 'ENOENT') {
-    //                 await this.writeData(path, {});
-    //                 return {};
-    //             }
-    //             throw err;
-    //         }
-            
-    //         // Read and decrypt data
-    //         const data = await fs.readFile(path); // Read as Buffer
-            
-    //         // Early empty file check
-    //         if (data.length === 0) {
-    //             return {};
-    //         }
-            
-    //         const privateKey = this.keyPair.privateKey;
-            
-    //         try {
-    //             const decryptedBuffer = crypto.privateDecrypt(
-    //                 {
-    //                     key: privateKey,
-    //                     padding: crypto.constants.RSA_PKCS1_PADDING
-    //                 },
-    //                 data
-    //             );
-    //             return JSON.parse(decryptedBuffer.toString()); // toString before parse
-    //         } catch (err) {
-    //             console.error('Decryption error:', err.message);
-    //             // If we can't decrypt, assume it's plain JSON and return empty object
-    //             return {};
-    //         }
-    //     } catch (err) {
-    //         console.error('Error reading data:', err.message);
-    //         return {};
-    //     }
-    // }
-
     async readData(path) {
         try {
-            // Check if file exists
             try {
                 await fs.access(path);
             } catch (err) {
-                // If file doesn't exist, create it
                 if (err.code === 'ENOENT') {
                     await this.writeData(path, {});
                     return {};
                 }
                 throw err;
             }
-            
-            // Read data
-            const data = await fs.readFile(path); // Read as Buffer
-            
-            // Early empty file check
+
+            const data = await fs.readFile(path);
             if (data.length === 0) {
                 return {};
             }
-            
-            const privateKey = this.keyPair.privateKey;
-            
+            console.log('Data:', data.toString());
+
+            // First try to decrypt the data
             try {
-                // Use OAEP padding with SHA-256 instead of PKCS1 padding
+                const privateKey = this.keyPair.privateKey;
                 const decryptedBuffer = crypto.privateDecrypt(
                     {
                         key: privateKey,
@@ -846,55 +493,61 @@ class Peer {
                     },
                     data
                 );
-                return JSON.parse(decryptedBuffer.toString()); // toString before parse
-            } catch (err) {
-                console.error('Decryption error:', err.message);
-                
-                // Try reading as plain JSON as fallback
+                console.log('Decrypted data:', decryptedBuffer.toString());
+                return JSON.parse(decryptedBuffer.toString());
+            } catch (decryptErr) {
+                console.log('Decryption failed, attempting to read as plain JSON');
+                // If decryption fails, try to read as plain JSON
                 try {
                     const jsonString = data.toString('utf8');
-                    return JSON.parse(jsonString);
+                    const parsedData = JSON.parse(jsonString);
+                    // If we successfully read as plain JSON, re-encrypt it
+                    await this.writeData(path, parsedData);
+                    return parsedData;
                 } catch (jsonErr) {
-                    console.error('Failed to parse as plain JSON:', jsonErr.message);
-                    return {};
+                    console.log('Failed to parse as plain JSON, initializing new data store');
+                    // If both decryption and JSON parsing fail, initialize new data
+                    const newData = {};
+                    await this.writeData(path, newData);
+                    return newData;
                 }
             }
         } catch (err) {
             console.error('Error reading data:', err.message);
-            return {};
+            // On any other error, initialize new data
+            const newData = {};
+            await this.writeData(path, newData);
+            return newData;
         }
     }
-    
+
     async writeData(path, data) {
         try {
             const publicKey = this.keyPair.publicKey;
             const dataBuffer = Buffer.from(JSON.stringify(data));
             
-            // RSA has size limitations, check if data is too large
-            const keySize = 2048; // Our key size in bits
-            const maxBytesToEncrypt = Math.floor(keySize / 8) - 66; // For OAEP with SHA-256 padding
-            
+            // Check if data is too large for RSA encryption
+            const maxBytesToEncrypt = Math.floor(2048 / 8) - 66; // RSA-2048 with OAEP
             if (dataBuffer.length > maxBytesToEncrypt) {
-                console.error(`Data too large to encrypt (${dataBuffer.length} bytes). RSA with 2048-bit key can only encrypt ${maxBytesToEncrypt} bytes.`);
-                // For large data, we should use hybrid encryption (symmetric + asymmetric)
-                // But for simplicity, we'll fall back to unencrypted JSON
+                console.warn(`Data too large to encrypt (${dataBuffer.length} bytes), storing as plain JSON`);
                 await this.writeJsonFile(path, data);
                 return;
             }
-            
+
+            // Encrypt the data
             const encryptedBuffer = crypto.publicEncrypt(
                 {
                     key: publicKey,
                     padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
                     oaepHash: 'sha256'
-                }, 
+                },
                 dataBuffer
             );
-            
+            console.log('Encrypted data:', encryptedBuffer.toString());
             await fs.writeFile(path, encryptedBuffer);
         } catch (err) {
             console.error('Error writing encrypted data:', err.message);
-            // Fall back to unencrypted as last resort
+            // Fallback to plain JSON if encryption fails
             await this.writeJsonFile(path, data);
         }
     }
@@ -906,48 +559,33 @@ class Peer {
                 const peerIp = peer.ip;
                 const peerPort = peer.port;
                 console.log(`Discovering peer at ${peerIp}:${peerPort}`);
-    
                 try {
-                    // Connect to peer
                     const socket = await this.connectToPeer(peerIp, peerPort);
-                    
-                    // Send discovery message
                     const discoverMessage = {
                         type: 'DISCOVER',
-                        payload: {
-                            identity: this.identity
-                        }
+                        payload: { identity: this.identity }
                     };
-                    
                     socket.write(JSON.stringify(discoverMessage));
-                    
-                    // The rest of discovery processing happens in the socket's data event handler
                 } catch (error) {
                     console.log(`Discovery failed at ${peerIp}:${peerPort} — skipping`);
                 }
             });
-    
         await Promise.allSettled(discoveryPromises);
     }
-    
+
     async autoDiscover(subnetMask, port) {
         console.log("Starting peer discovery");
         const interfaces = os.networkInterfaces();
         const myIp = this.identity.ip;
-    
         const discoveryTasks = [];
-    
+
         for (const iface of Object.values(interfaces)) {
             for (const ifaceDetail of iface) {
                 if (ifaceDetail.family === 'IPv4' && !ifaceDetail.internal) {
-                    // Use provided subnet mask instead of detected one
                     const subnet = ip.subnet(ifaceDetail.address, subnetMask);
-                    
-                    // If myIp is not in this subnet, skip
                     if (!ip.cidrSubnet(`${ifaceDetail.address}/${subnetMask}`).contains(myIp)) {
                         continue;
                     }
-    
                     for (
                         let current = ip.toLong(subnet.firstAddress);
                         current <= ip.toLong(subnet.lastAddress);
@@ -955,21 +593,14 @@ class Peer {
                     ) {
                         const targetIp = ip.fromLong(current);
                         if (targetIp === myIp) continue;
-    
                         discoveryTasks.push((async () => {
                             try {
-                                // Try to connect to peer
                                 const socket = await this.connectToPeer(targetIp, port).catch(() => null);
-                                
                                 if (socket) {
-                                    // Send discovery message
                                     const discoverMessage = {
                                         type: 'DISCOVER',
-                                        payload: {
-                                            identity: this.identity
-                                        }
+                                        payload: { identity: this.identity }
                                     };
-                                    
                                     socket.write(JSON.stringify(discoverMessage));
                                     console.log(`[DISCOVER] Sent discovery to peer at ${targetIp}`);
                                 }
@@ -981,20 +612,19 @@ class Peer {
                 }
             }
         }
-    
         await Promise.allSettled(discoveryTasks);
         console.log("PEER DISCOVERY COMPLETE");
     }
 
-    async getConfig(){
+    async getConfig() {
         return this.config;
     }
 
-    async getPeers(){
+    async getPeers() {
         return this.clients;
     }
 
-    async getData(){
+    async getData() {
         return await this.readData('./data.bin');
     }
 }
@@ -1002,9 +632,3 @@ class Peer {
 const peer = new Peer();
 await peer.initialize();
 export default peer;
-
-// // Uncomment to test automatic changes
-// setInterval(async() => {
-//     console.log("incrementing counter");
-//     await peer.set("counter", (await peer.get("counter")) + 1);
-// }, 2000);
