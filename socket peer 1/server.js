@@ -15,11 +15,11 @@ app.use(express.json());
 app.use(cors());
 
 // Serve static files
-app.use(express.static(__dirname));
+app.use(express.static(path.join(__dirname, 'frontend')));
 
 // Serve frontend.html at root
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'frontend.html'));
+  res.sendFile(path.join(__dirname, 'frontend/index.html'));
 });
 
 // Set a key-value
@@ -64,6 +64,16 @@ app.get('/peers', async (req, res) => {
   }
 });
 
+app.get('/trustedpeers', async(req, res) => {
+  try{
+    const tpeers = await peer.loadTrustedCertificates();
+    res.json(tpeers);
+  }
+  catch (err) {
+    res.status(500).json({ error: err.messagge });
+  }
+});
+
 // Load config and start server
 const config = JSON.parse(await fs.readFile('./config.json', 'utf8'));
 const port = config.dbServerPort;
@@ -71,11 +81,3 @@ const port = config.dbServerPort;
 app.listen(port, () => {
   console.log(`Express server running on http://localhost:${port}`);
 });
-
-// Optional auto-set loop
-// setInterval(async () => {
-//   await peer.set("name", `${new Date()}`);
-//   console.log(await peer.get("name"));
-//   console.log(await peer.getConfig());
-//   console.log(await peer.getPeers());
-// }, 5000);

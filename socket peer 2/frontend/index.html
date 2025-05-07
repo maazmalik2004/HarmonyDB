@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HarmonyDB</title>
+    <link href="styles.css" rel="stylesheet">
+</head>
+<body class="bg-white-100 text-black">
+  <!-- Notification -->
+  <div id="notification" class="fixed top-4 right-4 bg-gray-800 text-white px-4 py-2 rounded shadow-lg hidden transition-opacity duration-300"></div>
+
+  <!-- Navigation Bar -->
+  <nav class="bg-gray-800">
+    <div class="mx-2 max-w-7xl px-2 sm:px-6 lg:px-8">
+      <div class="relative flex h-16 items-center justify-between">
+        <div class="flex flex-1 items-center sm:items-stretch sm:justify-start">
+          <div class="flex items-center gap-2 text-2xl font-bold shrink-0">
+            <img class="h-9 w-auto" src="logo.png" alt="HarmonyDB">
+            <div class="text-white">HarmonyDB</div>
+          </div>
+          <div class="hidden sm:ml-6 sm:block">
+            <div class="flex space-x-4">
+              <a href="#" class="rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white">Dashboard</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+  <header class="bg-white shadow-sm">
+    <div class="mx-2 max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <h1 class="text-3xl font-bold tracking-tight text-gray-900">Peer Y Dashboard</h1>
+    </div>
+  </header>
+
+  <!-- Main Content: Three Sections -->
+  <main class="max-w-full mx-auto py-6 px-0">
+    <div class="flex flex-row w-full gap-2 min-h-[70vh] m-0">
+      <!-- Leftmost Section: Configuration & Trusted Peers (Accordion) -->
+      <section class="w-1/6 h-full bg-white rounded-none shadow-none border-r border-gray-200">
+        <h2 class="text-xl font-bold p-4">Overview</h2>
+        <!-- Configuration (No Accordion) -->
+        <div>
+          <h3 class="text-lg font-semibold px-4 pt-2">Configuration</h3>
+          <div id="configDisplay" class="p-4 text-sm overflow-auto max-h-60"></div>
+        </div>
+        <!-- Trusted Peers (Accordion) -->
+        <div class="border-b shadow-lg border-gray-200">
+          <button class="w-full text-left py-3 px-4 bg-gray-100 hover:bg-gray-200 flex justify-between items-center" onclick="toggleAccordion('peersContent', 'peersToggleIcon')">
+            <span class="font-semibold">Trusted Peers</span>
+            <span id="peersToggleIcon" class="text-gray-600">▼</span>
+          </button>
+          <div id="peersContent" class="max-h-0 overflow-hidden transition-all duration-300">
+            <div id="peersDisplay" class="p-4 text-sm overflow-auto max-h-60"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Middle Section: Overview (Connected Network) -->
+      <section class="w-3/6 bg-white rounded-xl shadow-2xl/30 border-r border-gray-200">
+        <h2 class="text-xl font-bold p-4">Network Overview</h2>
+        <div id="networkOverview" class="space-y-4 p-4 overflow-auto max-h-[70vh]"></div>
+      </section>
+
+      <!-- Right Section: Get/Set Value -->
+      <section class="w-2/6 bg-white mx-3 rounded-xl shadow-2xl/30">
+        <h2 class="text-xl font-bold p-4">Get/Set Value</h2>
+        <div class="p-4">
+          <div class="mb-6">
+            <h3 class="text-lg font-semibold mb-2">Get Value</h3>
+            <input type="text" id="getKey" placeholder="Enter key..." class="mb-2 p-2 w-full rounded border text-black" />
+            <button onclick="getValue()" class="mb-2 p-2 w-full bg-slate-500 text-white rounded hover:bg-slate-700">Get Value</button>
+            <div id="getValueDisplay" class="text-xs-black"></div>
+          </div>
+          <div>
+            <h3 class="text-lg font-semibold mb-2">Set Value</h3>
+            <input type="text" id="setKey" placeholder="Enter key..." class="mb-2 p-2 w-full rounded border text-black" />
+            <input type="text" id="setValue" placeholder="Enter value..." class="mb-2 p-2 w-full rounded border text-black" />
+            <button onclick="setValue()" class="mb-2 p-2 w-full bg-slate-500 text-white rounded hover:bg-slate-700">Set Value</button>
+            <div id="setValueDisplay" class="text-xs"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+      // Accordion toggle function (for Trusted Peers)
+    function toggleAccordion(contentId, iconId) {
+      const content = document.getElementById(contentId);
+      const icon = document.getElementById(iconId);
+      const isOpen = content.classList.contains('max-h-60');
+
+      if (isOpen) {
+        content.classList.remove('max-h-60');
+        content.classList.add('max-h-0');
+        icon.textContent = '▼';
+      } else {
+        content.classList.remove('max-h-0');
+        content.classList.add('max-h-60');
+        icon.textContent = '▲';
+      }
+    }
+
+    // Toggle function for Identity accordion
+    function toggleIdentityAccordion() {
+      const content = document.getElementById('identityContent');
+      const icon = document.getElementById('identityToggleIcon');
+      const isOpen = content.classList.contains('max-h-60');
+
+      if (isOpen) {
+        content.classList.remove('max-h-60');
+        content.classList.add('max-h-0');
+        icon.textContent = '▼';
+      } else {
+        content.classList.remove('max-h-0');
+        content.classList.add('max-h-60');
+        icon.textContent = '▲';
+      }
+    }
+
+    // Toggle function for Peers to Discover accordion
+    function togglePeersToDiscoverAccordion() {
+      const content = document.getElementById('peersToDiscoverContent');
+      const icon = document.getElementById('peersToDiscoverToggleIcon');
+      const isOpen = content.classList.contains('max-h-40');
+
+      if (isOpen) {
+        content.classList.remove('max-h-40');
+        content.classList.add('max-h-0');
+        icon.textContent = '▼';
+      } else {
+        content.classList.remove('max-h-0');
+        content.classList.add('max-h-40');
+        icon.textContent = '▲';
+      }
+    }
+
+    // Get value from the server
+    async function getValue() {
+      const key = document.getElementById('getKey').value.trim();
+      const getValueDisplay = document.getElementById('getValueDisplay');
+      
+      // Clear display if key is empty
+      if (!key) {
+        getValueDisplay.innerHTML = '';
+        return;
+      }
+    
+      try {
+        const res = await fetch(`${API_BASE}/get/${encodeURIComponent(key)}`);
+        const data = await res.json();
+        
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to get value');
+        }
+        
+        if (data.value === undefined) {
+          getValueDisplay.innerHTML = `<p class="text-gray-500">Key not found</p>`;
+        } else {
+          getValueDisplay.innerHTML = `<p class="text-gray-700">${key}: ${JSON.stringify(data.value)}</p>`;
+        }
+        // Clear input after successful get
+        document.getElementById('getKey').value = '';
+      } catch (err) {
+        getValueDisplay.innerHTML = `<p class="text-red-500">Error: ${err.message}</p>`;
+      }
+    }
+
+    // Make API_BASE configurable
+    const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+      ? `http://${window.location.hostname}:4001`
+      : 'http://172.29.95.173:4001';
+
+    function showNotification(message) {
+      const notification = document.getElementById('notification');
+      notification.textContent = message;
+      notification.classList.remove('hidden');
+      notification.classList.add('opacity-100');
+      setTimeout(() => {
+        notification.classList.remove('opacity-100');
+        notification.classList.add('opacity-0');
+        setTimeout(() => {
+          notification.classList.add('hidden');
+        }, 300);
+      }, 3000);
+    }
+    
+    // Set value on the server
+    async function setValue() {
+      const key = document.getElementById('setKey').value.trim();
+      const valueInput = document.getElementById('setValue').value.trim();
+      const setValueDisplay = document.getElementById('setValueDisplay');
+      
+      // Clear display if either key or value is empty
+      if (!key || !valueInput) {
+        setValueDisplay.innerHTML = '';
+        return;
+      }
+    
+      let parsedValue;
+      try {
+        // Try parsing as JSON
+        parsedValue = JSON.parse(valueInput);
+      } catch (jsonErr) {
+        // Not JSON, check if it's a number
+        if (!isNaN(valueInput) && valueInput !== '') {
+          parsedValue = Number(valueInput);
+        } else if (valueInput === '') {
+          setValueDisplay.innerHTML = '';
+          return;
+        } else {
+          // Treat as string
+          parsedValue = valueInput;
+        }
+      }
+    
+      try {
+        const res = await fetch(`${API_BASE}/set`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, value: parsedValue })
+        });
+        
+        const data = await res.json();
+        
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to set value');
+        }
+        
+        setValueDisplay.innerHTML = `<p class="text-green-600">key set successfully!</p>`;
+        // Clear inputs after successful set
+        document.getElementById('setKey').value = '';
+        document.getElementById('setValue').value = '';
+      } catch (err) {
+        setValueDisplay.innerHTML = `<p class="text-red-500">Error: ${err.message}</p>`;
+      }
+    }    
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // Fetch and render config
+      async function fetchConfig() {
+        const configDisplay = document.getElementById('configDisplay');
+        try {
+          const res = await fetch(`${API_BASE}/config`);
+          if (!res.ok) throw new Error('Failed to fetch config');
+          const data = await res.json();
+
+          // Extract the required objects
+          const identity = data.identity || {};
+          const autodiscoverPeers = data.autodiscoverPeers !== undefined ? data.autodiscoverPeers : false;
+          const peersToDiscover = data.peersToDiscover || [];
+
+          const selfName = identity.name || '';
+
+          // Extract names from peersToDiscover
+          const peersToDiscoverNames = peersToDiscover.filter(peer => peer.name !== selfName).map(peer => peer.name || 'N/A');
+
+          // Render the configuration as a list
+          configDisplay.innerHTML = `
+            <!-- Identity Accordion -->
+            <div class="border-b border-gray-200 mb-2">
+              <button class="w-full text-left py-2 px-3 bg-gray-100 hover:bg-gray-200 flex justify-between items-center" onclick="toggleIdentityAccordion()">
+                <span class="font-semibold text-sm">Identity</span>
+                <span id="identityToggleIcon" class="text-gray-600 text-sm">▼</span>
+              </button>
+              <div id="identityContent" class="max-h-0 overflow-hidden transition-all duration-300">
+                <div class="p-4">
+                  <div class="border border-gray-200 rounded-lg shadow-md p-4 bg-white">
+                    <h4 class="text-sm font-semibold text-gray-900 mb-2">Identity Card</h4>
+                    <div class="flex flex-wrap gap-2">
+                      <span class="inline-flex items-center px-2 py-1 rounded bg-gray-100 text-gray-800 text-xs font-medium">
+                        Name: ${identity.name || 'N/A'}
+                      </span>
+                      <span class="inline-flex items-center px-2 py-1 rounded bg-gray-100 text-gray-800 text-xs font-medium">
+                        IP: ${identity.ip || 'N/A'}
+                      </span>
+                      <span class="inline-flex items-center px-2 py-1 rounded bg-gray-100 text-gray-800 text-xs font-medium">
+                        Port: ${identity.port || 'N/A'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Autodiscover Peers (Badge Next to Label) -->
+            <div class="mb-2 flex items-center gap-2">
+              <h4 class="text-sm font-semibold text-gray-900">Autodiscover Peers:</h4>
+              <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                autodiscoverPeers
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-red-100 text-red-800'
+              }">
+                ${autodiscoverPeers ? 'True' : 'False'}
+              </span>
+            </div>
+
+            <!-- Peers to Discover Accordion -->
+            <div class="border-b border-gray-200">
+              <button class="w-full text-left py-2 px-3 bg-gray-100 hover:bg-gray-200 flex justify-between items-center" onclick="togglePeersToDiscoverAccordion()">
+                <span class="font-semibold text-sm">Peers to Discover</span>
+                <span id="peersToDiscoverToggleIcon" class="text-gray-600 text-sm">▼</span>
+              </button>
+              <div id="peersToDiscoverContent" class="max-h-0 overflow-hidden transition-all duration-300">
+                <div class="p-4">
+                  ${
+                    peersToDiscoverNames.length > 0
+                      ? `
+                        <div class="flex flex-wrap gap-2">
+                          ${peersToDiscoverNames
+                            .map(
+                              name => `
+                                <span class="inline-flex items-center px-2 py-1 rounded bg-gray-100 text-gray-800 text-xs font-medium">
+                                  ${name}
+                                </span>
+                              `
+                            )
+                            .join('')}
+                        </div>
+                      `
+                      : `<p class="text-gray-500 text-sm">No peers to discover found.</p>`
+                  }
+                </div>
+              </div>
+            </div>
+          `;
+        } catch (err) {
+          configDisplay.innerHTML = `<p class="text-red-500">Error: ${err.message}</p>`;
+          showNotification(`Error: ${err.message}`);
+        }
+      }
+
+      // Fetch and render trusted peers
+      async function fetchTrustedPeers() {
+        const peersDisplay = document.getElementById('peersDisplay');
+        try {
+          const res = await fetch(`${API_BASE}/trustedpeers`);
+          if (!res.ok) throw new Error('Failed to fetch peers');
+          const data = await res.json();
+          // Get the peer names
+          const peerNames = Object.keys(data);
+      
+          // If no peers, display a message
+          if (peerNames.length === 0) {
+            peersDisplay.innerHTML = `<p class="text-gray-500  text-center">No trusted peers found.</p>`;
+            return;
+          }
+      
+          // Render the peer names, one per line
+          peersDisplay.innerHTML = `
+            <div class="text-gray-900">
+              ${peerNames.join('<br>')}
+            </div>
+          `;
+        } catch (err) {
+          peersDisplay.innerHTML = `<p class="text-red-500">Error: ${err.message}</p>`;
+          showNotification(`Error: ${err.message}`);
+        }
+      }
+
+      async function renderNetworkOverview() {
+        const container = document.getElementById('networkOverview');
+        container.innerHTML = '';
+      
+        try {
+          const configRes = await fetch(`${API_BASE}/config`);
+          if (!configRes.ok) throw new Error('Failed to fetch config');
+          const config = await configRes.json();
+          const peersRes = await fetch(`${API_BASE}/peers`);
+          if (!peersRes.ok) throw new Error('Failed to fetch peers');
+          const peers = await peersRes.json();
+          const discoverPeers = config.peersToDiscover || [];
+      
+          // Extract the current peer's name (self)
+          const selfName = config.identity.name || '';
+      
+          // Filter out self from discoverPeers
+          const filteredDiscoverPeers = discoverPeers.filter(peer => peer.name !== selfName);
+      
+          // This Peer Card
+          const thisPeerCard = document.createElement('div');
+          thisPeerCard.className = 'p-4 bg-white-100 rounded-lg shadow border-2 border-blue-500 mb-4 mx-auto';
+          thisPeerCard.innerHTML = `
+            <h3 class="text-sm font-bold text-blue-400">${config.identity.name} (This Peer)</h3>
+            <p class="text-xs text-gray-800">IP: ${config.identity.ip}</p>
+            <p class="text-xs text-gray-800">Port: ${config.identity.port}</p>
+          `;
+          container.appendChild(thisPeerCard);
+      
+          // Container for Peers to Discover Cards (flex row)
+          const peersContainer = document.createElement('div');
+          peersContainer.className = 'flex flex-row space-x-4 flex-wrap ';
+          container.appendChild(peersContainer);
+      
+          // Connected Peers Cards
+          if (filteredDiscoverPeers.length === 0) {
+            const emptyMessage = document.createElement('p');
+            emptyMessage.className = 'text-gray-500 text-center';
+            emptyMessage.textContent = 'No peers to discover.';
+            container.appendChild(emptyMessage);
+          } else {
+            filteredDiscoverPeers.forEach(peer => {
+              const peerCard = document.createElement('div');
+              peerCard.className = `p-4 rounded-lg shadow border-2 w-48 flex-shrink-0 ${
+                peers[peer.name]
+                  ? 'bg-white-100 border-green-500'
+                  : 'bg-gray-100 border-gray-400'
+              }`;
+              peerCard.innerHTML = `
+                <h3 class="text-sm font-bold ${
+                  peers[peer.name]
+                    ? 'text-green-700'
+                    : 'text-gray-700'
+                }">${peer.name}</h3>
+                <p class="text-xs text-gray-800">IP: ${peer.ip}</p>
+                <p class="text-xs text-gray-800">Port: ${peer.port}</p>
+                <p class="text-xs ${
+                  peers[peer.name]
+                    ? 'text-green-600'
+                    : 'text-gray-600'
+                }">${peers[peer.name] ? 'Connected' : 'Not Connected'}</p>
+              `;
+              peersContainer.appendChild(peerCard);
+            });
+          }
+        } catch (err) {
+          container.innerHTML = `<p class="text-red-500 text-center">Error: ${err.message}</p>`;
+          showNotification(`Error: ${err.message}`);
+        }
+      }
+
+      // Initialize the dashboard
+      showNotification('Loading HarmonyDB Dashboard...');
+      fetchConfig();
+      fetchTrustedPeers();
+      renderNetworkOverview();
+
+      // Add input event listeners
+      const getKeyInput = document.getElementById('getKey');
+      const setKeyInput = document.getElementById('setKey');
+      const setValueInput = document.getElementById('setValue');
+      const getValueDisplay = document.getElementById('getValueDisplay');
+      const setValueDisplay = document.getElementById('setValueDisplay');
+
+      // Get value input listener
+      getKeyInput.addEventListener('input', () => {
+        if (!getKeyInput.value.trim()) {
+          getValueDisplay.innerHTML = '';
+        }
+      });
+
+      // Set value input listeners
+      setKeyInput.addEventListener('input', () => {
+        if (!setKeyInput.value.trim() || !setValueInput.value.trim()) {
+          setValueDisplay.innerHTML = '';
+        }
+      });
+
+      setValueInput.addEventListener('input', () => {
+        if (!setKeyInput.value.trim() || !setValueInput.value.trim()) {
+          setValueDisplay.innerHTML = '';
+        }
+      });
+
+      // Add button click listeners
+      document.querySelector('button[onclick="getValue()"]').addEventListener('click', getValue);
+      document.querySelector('button[onclick="setValue()"]').addEventListener('click', setValue);
+    });
+  </script>
+</body>
+</html>

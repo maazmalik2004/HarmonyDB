@@ -15,11 +15,11 @@ app.use(express.json());
 app.use(cors());
 
 // Serve static files
-app.use(express.static(__dirname));
+app.use(express.static(path.join(__dirname, 'frontend')));
 
-// Serve frontend.html at root
+// Serve index.html at root
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'frontend.html'));
+  res.sendFile(path.join(__dirname, 'frontend/index.html'));
 });
 
 // Set a key-value
@@ -60,6 +60,16 @@ app.get('/peers', async (req, res) => {
     const peers = await peer.getPeers();
     res.json(peers);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/trustedpeers', async(req, res) => {
+  try{
+    const tpeers = await peer.loadTrustedCertificates();
+    res.json(tpeers);
+  }
+  catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
