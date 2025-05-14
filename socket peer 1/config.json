@@ -5,16 +5,16 @@
     "dbServerPort":4000,
     "identity":{
         "name":"peerx",
-        "ip":"172.29.95.173",
+        "ip":"172.29.193.59",
         "port":5000
     },
     "peersToDiscover":[{
         "name":"peerx",
-        "ip":"172.29.95.173",
+        "ip":"172.29.193.59",
         "port":5000
     },{
         "name":"peery",
-        "ip":"172.29.95.173",
+        "ip":"172.29.193.59",
         "port":5001
     },{
         "name":"peerz",

@@ -1,3 +1,4 @@
+//server.js
 import express from 'express';
 import cors from 'cors';
 import peer from './peer.js';
@@ -71,6 +72,16 @@ app.get('/trustedpeers', async(req, res) => {
   }
   catch (err) {
     res.status(500).json({ error: err.messagge });
+  }
+});
+
+// Get current synchronized time
+app.get('/time', async (req, res) => {
+  try {
+    const time = peer.getCurrentTime();
+    res.json({ time: new Date(time).toISOString() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

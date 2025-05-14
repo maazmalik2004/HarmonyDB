@@ -1,3 +1,4 @@
+//server.js
 import express from 'express';
 import cors from 'cors';
 import peer from './peer.js';
@@ -17,7 +18,7 @@ app.use(cors());
 // Serve static files
 app.use(express.static(path.join(__dirname, 'frontend')));
 
-// Serve index.html at root
+// Serve frontend.html at root
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'frontend/index.html'));
 });
@@ -70,6 +71,16 @@ app.get('/trustedpeers', async(req, res) => {
     res.json(tpeers);
   }
   catch (err) {
+    res.status(500).json({ error: err.messagge });
+  }
+});
+
+// Get current synchronized time
+app.get('/time', async (req, res) => {
+  try {
+    const time = peer.getCurrentTime();
+    res.json({ time: new Date(time).toISOString() });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
@@ -81,11 +92,3 @@ const port = config.dbServerPort;
 app.listen(port, () => {
   console.log(`Express server running on http://localhost:${port}`);
 });
-
-// Optional auto-set loop
-// setInterval(async () => {
-//   await peer.set("name", `${new Date()}`);
-//   console.log(await peer.get("name"));
-//   console.log(await peer.getConfig());
-//   console.log(await peer.getPeers());
-// }, 5000);
