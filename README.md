@@ -1,7 +1,7 @@
-#HarmonyDB- A Lightweight Secure Distributed Key-Value Store
+# HarmonyDB- A Lightweight Secure Distributed Key-Value Store
 ![Screenshot 2025-05-04 175403](https://github.com/user-attachments/assets/986cdf5d-1a0b-43bc-919d-4d19243c862c)
 
-##configure a peer- config.json
+## Configure a peer- config.json
 
 ```json
 {
@@ -29,14 +29,14 @@
     }]
 }
 ```
-##start a peer
+## Start a peer
 
 ```bash
 node server.js
 ```
-###wait for "Express server running on http://localhost:<PORT>"
+### Wait for "Express server running on http://localhost:<PORT>"
 
-##Access the dashboard- .\frontend\index.html
+## Access the dashboard- .\frontend\index.html
 
 ![image](https://github.com/user-attachments/assets/4efef37a-81de-46e6-bcbe-7aef8594605f)
 
