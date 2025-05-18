@@ -34,7 +34,7 @@
 ```bash
 node server.js
 ```
-### Wait for "Express server running on http://localhost:<PORT>"
+### Wait for "Express server running on http://localhost:PORT"
 
 ## Access the dashboard- .\frontend\index.html
 
